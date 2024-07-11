@@ -1,0 +1,36 @@
+<EntityDescriptor entityID="https://server.drophouse.ai/saml/metadata"
+                  xmlns="urn:oasis:names:tc:SAML:2.0:metadata">
+  <SPSSODescriptor AuthnRequestsSigned="true" WantAssertionsSigned="true" protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+    <KeyDescriptor use="signing">
+      <KeyInfo xmlns="http://www.w3.org/2000/09/xmldsig#">
+        <X509Data>
+          <X509Certificate>
+            MIIDbTCCAlWgAwIBAgIUWCayq9gj+Lj5roGrVEvxhnpnbxgwDQYJKoZIhvcNAQEL
+            BQAwRjELMAkGA1UEBhMCVVMxETAPBgNVBAgMCElsbGlub2lzMRAwDgYDVQQHDAdD
+            aGljYWdvMRIwEAYDVQQKDAlEcm9waG91c2UwHhcNMjQwNjE2MjE0NzI0WhcNMjUw
+            NjE2MjE0NzI0WjBGMQswCQYDVQQGEwJVUzERMA8GA1UECAwISWxsaW5vaXMxEDAO
+            BgNVBAcMB0NoaWNhZ28xEjAQBgNVBAoMCURyb3Bob3VzZTCCASIwDQYJKoZIhvcN
+            AQEBBQADggEPADCCAQoCggEBANHZdV2u0bt6HKZGSi9+1vDeUroDTdooDO25qAdN
+            77o+HMIFcT4LMQ4GltAVvxEPh/UZckqWQ9HHsZdeZW86EwSiZFoo/HTHtBPsCGNV
+            MlqC/clSfVCqsjR2T+/ziN8v3RlPKtOGtFG2GvJAtdOA3l1yfFVDxiu3Txe3qMw9
+            Er4WI7rYn5aMSQB7E3X7ZB2DkKw17FF2neDZbRIrHU2Qu9jYAqT7p18VtXhVY3ws
+            prWuFJ37GcwN8FcHgAZQNp10YH0vT8tLJSzqVfplobOqXivGuaRupjwUsysZSLI8
+            GPwUuPSzBzKrWsxxKXZ7BLKkjBPP3Fmn7fKdGRujDp3eSesCAwEAAaNTMFEwHQYD
+            VR0OBBYEFNo0kft1/fULxi4TwYH1TGPt0ntQMB8GA1UdIwQYMBaAFNo0kft1/fUL
+            xi4TwYH1TGPt0ntQMA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEB
+            ANDxIHaIy0U0kKj0eYQ9tlaSlPv8SQuO65wZURQQ320fAhZkqdmowOd+7jvrkLgT
+            lBKK6S4dmNnuFQK0w4OxCm9288rIus5Jo3fKFJcXaYNmkmbwYPtbzESzjeCKftHm
+            5BpKdYPq0ZadeQImTYxKvI4neMMTBJ3CcWpR5VFV2pfDDFo5WcGFmWII4Yr3iq2x
+            INmlP/SwwEhKUxDp7JwGvfiMHOOf4eMiaVQsyLaK2bsq3tUaHZSj1bfxxmEHOOm1
+            K+ELVnbR+bv2TXujSJ4jXk36ATCail8Fwb7iCrMo+gxvjn5chU/R27dzyt2u+df/
+            YnUbheernSyd8LR3grJDAPI=
+          </X509Certificate>
+        </X509Data>
+      </KeyInfo>
+    </KeyDescriptor>
+    <SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+                         Location="https://server.drophouse.ai/saml/slo"/>
+    <AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+                              Location="https://server.drophouse.ai/saml/acs" index="1"/>
+  </SPSSODescriptor>
+</EntityDescriptor>
