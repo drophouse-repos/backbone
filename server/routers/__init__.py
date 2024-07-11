@@ -8,7 +8,6 @@ from routers.stripe import stripe_router
 from routers.email import email_router
 from routers.static import static_router
 from routers.prices import prices_router
-from routers.admin_dashboard import admin_dashboard_router
 
 __all__ = [
     "imagen_router",
@@ -20,6 +19,5 @@ __all__ = [
     "cart_router",
     "stripe_router",
     "email_router",
-    "prices_router",
-    "admin_dashboard_router"
+    "prices_router"
 ]
