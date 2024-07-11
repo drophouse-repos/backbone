@@ -12,3 +12,5 @@ murray/
 *$py.class
 *.so
 *.log
+
+fly.toml
