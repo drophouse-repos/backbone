@@ -8,7 +8,7 @@ from inspect import currentframe, getframeinfo
 from fastapi import APIRouter, Body, HTTPException
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, constr
 from dotenv import load_dotenv
 from database.BASE import BaseDatabaseOperation
 from db import get_db_ops
@@ -32,7 +32,9 @@ class PlaceOrderDataRequest(BaseModel):
 
 
 async def place_order(
-    request: PlaceOrderDataRequest, user_id: str, usertype:str,
+    request: PlaceOrderDataRequest, user_id: str, usertype:str, 
+    org_id:str,
+    org_name:str,
     db_ops: BaseDatabaseOperation = OrderOperations,
 ):
     try:
@@ -43,6 +45,8 @@ async def place_order(
         order_info = OrderItem(
             user_id=user_id,
             user_type=usertype,
+            org_id = org_id,
+            org_name = org_name,
             order_id=order_id,
             item=item,
             shipping_info=shipping_info,

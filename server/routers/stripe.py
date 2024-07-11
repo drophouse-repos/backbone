@@ -49,11 +49,11 @@ async def create_student_checkout(
     user_id: str = Depends(verify_id_token),
 ):
     try:
-        isOrdered = await user_db_ops.check_student_order(user_id)
-        if(isOrdered):
-            raise HTTPException(status_code=422, detail={'message':"You have already placed an order. Contact us if you want to change it", 'currentFrame': getframeinfo(currentframe())})
-
-        shipping_info_meta = CheckoutModel.shipping_info
+        shipping_info_meta = CheckoutModel.shipping_info,
+        org_id = CheckoutModel.org_id,
+        org_name = CheckoutModel.org_name
+        # print(org_id)
+        print(org_name)
         for item in CheckoutModel.products:
             img_id = item.img_id
             thumbnail = item.thumbnail
@@ -64,7 +64,7 @@ async def create_student_checkout(
         items = CheckoutModel.products
         print(items)
         order_data_request = PlaceOrderDataRequest(shipping_info=shipping_info_meta, item=items)
-        order_id = await place_order(order_data_request, user_id, 'student', order_db_ops)
+        order_id = await place_order(order_data_request, user_id, 'student',org_id, org_name, order_db_ops)
         
         order_model = await order_db_ops.getByOrderID(order_id)
         priceMap = await price_db_ops.get()
@@ -142,6 +142,10 @@ async def create_checkout_session(
     line_items = []  
     total_purchase_price = 0
     priceMap = await price_db_ops.get()
+    org_id = CheckoutModel.org_id,
+    org_name = CheckoutModel.org_name
+    # print(org_id)
+    print(org_name)
     for item in CheckoutModel.products:
         img_id = item.img_id
         thumbnail = item.thumbnail
@@ -182,9 +186,11 @@ async def create_checkout_session(
         user_email = shipping_info_meta.email
         shipping_info = f"{shipping_info_meta.streetAddress} {shipping_info_meta.city} {shipping_info_meta.postalZipcode}"
         items = CheckoutModel.products
-        print(items)
+        org_id = CheckoutModel.org_id
+        org_name = str(CheckoutModel.org_name)
+        print("Org Name : ",str(org_name))
         order_data_request = PlaceOrderDataRequest(shipping_info=shipping_info_meta, item=items)
-        order_id = await place_order(order_data_request, user_id, 'alumni', order_db_ops)
+        order_id = await place_order(order_data_request, user_id, 'alumni',org_id, org_name, order_db_ops)
         encrypt_model = await salt_db_ops.create_and_encrypt(order_id)
         encrypt_id = encrypt_model.salt_id
         encrypted_oid = encrypt_model.encrypted_data
