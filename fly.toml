@@ -4,7 +4,7 @@
 #
 
 
-app = ''  # TODO: add your app name here
+app = 'backbone-drophouse'
 primary_region = 'ord'
 
 [build]
