@@ -49,10 +49,13 @@ async def create_student_checkout(
     user_id: str = Depends(verify_id_token),
 ):
     try:
+        isOrdered = await user_db_ops.check_student_order(user_id)
+        if(isOrdered):
+            raise HTTPException(status_code=422, detail={'message':"You have already placed an order. Contact us if you want to change it", 'currentFrame': getframeinfo(currentframe())})
+
         shipping_info_meta = CheckoutModel.shipping_info,
         org_id = CheckoutModel.org_id,
         org_name = CheckoutModel.org_name
-        # print(org_id)
         print(org_name)
         for item in CheckoutModel.products:
             img_id = item.img_id
@@ -144,7 +147,6 @@ async def create_checkout_session(
     priceMap = await price_db_ops.get()
     org_id = CheckoutModel.org_id,
     org_name = CheckoutModel.org_name
-    # print(org_id)
     print(org_name)
     for item in CheckoutModel.products:
         img_id = item.img_id
