@@ -18,7 +18,8 @@ from routers import (
     stripe_router,
     email_router,
     static_router,
-    prices_router
+    prices_router,
+    org_router
 )
 import uvicorn
 import logging
@@ -91,6 +92,7 @@ app.include_router(order_info_router)
 app.include_router(stripe_router)
 app.include_router(email_router)
 app.include_router(static_router)
+app.include_router(org_router)
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):

@@ -1,6 +1,6 @@
 import datetime
 from typing import List
-from pydantic import StringConstraints, BaseModel, Field
+from pydantic import StringConstraints, BaseModel, Field, constr
 from typing_extensions import Annotated
 from enum import Enum
 from models.ItemModel import ItemModel
@@ -29,6 +29,15 @@ class OrderItem(BaseModel):
         ..., alias="user_id", description="User ID is required."
     )
     user_type: UserTypes = Field(..., description="Usertype is required.")
+
+    org_id: Annotated[str, StringConstraints(min_length=1)] = Field(
+        ..., alias="org_id", description="Organisation Id is required."
+    )
+
+    org_name: Annotated[str, StringConstraints(min_length=1)] = Field(
+        ..., alias="org_name", description="Organisation Name is required."
+    )
+
     order_id: Annotated[str, StringConstraints(min_length=1)] = Field(
         ..., alias="order_id", description="Unique order ID is required."
     )
