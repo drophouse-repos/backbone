@@ -39,7 +39,7 @@ app = FastAPI()
 email_service = EmailService()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://drophouse.vercel.app", "https://superman-kappa.vercel.app", "https://staging-fe-v2.vercel.app", "https://drophouse.rose-hulman.edu", "https://student-model-rose.vercel.app", "https://drophouse-student.rose-hulman.edu", "https://demo.drophouse.ai", "https://drophouse.ai"],
+    allow_origins=["http://localhost:3000", "https://drophouse.vercel.app", "https://superman-kappa.vercel.app", "https://staging-fe-v2.vercel.app", "https://drophouse.rose-hulman.edu", "https://nutrastack.vercel.app", "https://drophouse-student.rose-hulman.edu", "https://demo.drophouse.ai", "https://drophouse.ai"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
