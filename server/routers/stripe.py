@@ -36,8 +36,6 @@ stripe_webhook_key = os.environ.get("STRIPE_WEBHOOK_SECRET")
 stripe_tax_id = os.environ.get("STRIPE_TAX_ID")
 
 stripe_router = APIRouter()
-
-frontend_url = os.environ.get("FRONTEND_DOMAIN")
 freeShipping = int(os.environ.get("FREE_SHIPPING_THRESHOLD")) if os.environ.get("FREE_SHIPPING_THRESHOLD") else 100
 
 @stripe_router.post("/create-student-checkout")
@@ -138,6 +136,7 @@ async def create_student_checkout(
 
 @stripe_router.post("/create-checkout-session")
 async def create_checkout_session(
+    request : Request,
     CheckoutModel: CheckoutModel,
     order_db_ops: BaseDatabaseOperation = Depends(get_db_ops(OrderOperations)),
     price_db_ops: BaseDatabaseOperation = Depends(get_db_ops(PricesOperations)),
@@ -222,14 +221,15 @@ async def create_checkout_session(
                         # }
                     }
                 }
-        
+
+        frontend_url = request.headers.get('origin')
         checkout_session = stripe.checkout.Session.create(
             payment_method_types=["card"],
             customer_email=user_email,
             line_items=line_items,
             mode="payment",
-            success_url=frontend_url + "/success",
-            cancel_url=frontend_url + "/product",
+            success_url=f"{frontend_url}/success",
+            cancel_url=f"{frontend_url}/product",
             #automatic_tax={'enabled': True},
             expires_at=int(time.time()) + 3600,
             allow_promotion_codes=True,
