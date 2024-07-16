@@ -11,7 +11,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 printful_router = APIRouter()
 
-# Ensure your .env file has a line like this: PRINTFUL_PRIVATE_TOKEN=your_private_token
 PRIVATE_TOKEN = os.environ.get('PRINTFUL_PRIVATE_TOKEN');
 BASE_URL = 'https://api.printful.com'
 
