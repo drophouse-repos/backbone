@@ -15,7 +15,6 @@ class AddressType(str, Enum):
     PRIMARY = "primary"
     SECONDARY = "secondary"
 
-
 class ShippingModel(BaseModel):
     firstName: Annotated[str, StringConstraints(min_length=1)] = Field(
         ..., alias="firstName", description="First name is required."
