@@ -59,19 +59,12 @@ class UserOperations(BaseDatabaseOperation):
     
     async def update(self, user_id: str, order_id: str, new_status: str):
         try:
-            user_update_query = {"user_id": user_id, "orders.order_id": order_id}
-            user_update_fields = {"$set": {"orders.$.status": new_status}}
-
-            user_update_result = await self.db.users.update_one(user_update_query, user_update_fields)
-
-            # Update the 'orders' collection directly
             orders_update_result = await self.db.orders.update_one(
                 {"order_id": order_id},
                 {"$set": {"status": new_status}}
             )
 
-            # Check if both updates were successful
-            if user_update_result.modified_count > 0 and orders_update_result.modified_count > 0:
+            if orders_update_result.modified_count > 0:
                 logger.info(f"Order status updated successfully for order ID {order_id}")
                 return True
             else:
@@ -88,7 +81,6 @@ class UserOperations(BaseDatabaseOperation):
                 "user_id": user_id,
                 "orders": {
                     "$elemMatch": {
-                        "user_type": "student",
                         "status": {"$in": ["pending", "verified", "shipped", "delivering", "delivered"]}
                     }
                 }
@@ -103,21 +95,14 @@ class UserOperations(BaseDatabaseOperation):
 
     async def update_order_status(self, user_id: str, order_id: str, new_status: str):
         try:
-            user_update_result = await self.db.users.update_one(
-                {"user_id": user_id, "orders.order_id": order_id},
-                {"$set": {"orders.$.status": new_status}},
-            )
-
             orders_update_result = await self.db.orders.update_one(
                 {"order_id": order_id},
                 {"$set": {"status": new_status}},
             )
 
             return (
-                user_update_result.modified_count > 0
-                and orders_update_result.modified_count > 0
+                orders_update_result.modified_count > 0
             )
         except Exception as e:
             logger.critical(f"Error updating order status: {e}")
             return False
-        

@@ -66,8 +66,9 @@ async def create_student_checkout(
 
         items = CheckoutModel.products
         print(items)
+        await order_db_ops.remove_unpaid_order(user_id)
         order_data_request = PlaceOrderDataRequest(shipping_info=shipping_info_meta, item=items)
-        order_id = await place_order(order_data_request, user_id, 'student',org_id, org_name, order_db_ops)
+        order_id = await place_order(order_data_request, user_id, org_id, org_name, order_db_ops)
         
         order_model = await order_db_ops.getByOrderID(order_id)
         priceMap = await price_db_ops.get()
@@ -191,13 +192,12 @@ async def create_checkout_session(
         items = CheckoutModel.products
         org_id = CheckoutModel.org_id
         org_name = str(CheckoutModel.org_name)
-        print("Org Name : ",str(org_name))
+        await order_db_ops.remove_unpaid_order(user_id)
         order_data_request = PlaceOrderDataRequest(shipping_info=shipping_info_meta, item=items)
-        order_id = await place_order(order_data_request, user_id, 'alumni',org_id, org_name, order_db_ops)
+        order_id = await place_order(order_data_request, user_id, org_id, org_name, order_db_ops)
         encrypt_model = await salt_db_ops.create_and_encrypt(order_id)
         encrypt_id = encrypt_model.salt_id
         encrypted_oid = encrypt_model.encrypted_data
-        await order_db_ops.remove_unpaid_order(user_id)
         
         shipping_option = {
                     'shipping_rate_data': {
@@ -374,5 +374,3 @@ async def stripe_webhook(
     else:
         logger.info(f"Unhandled event type {event['type']}")
     return JSONResponse({"status": "success"})
-
-
