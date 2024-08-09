@@ -105,25 +105,46 @@ async def record_analysis(background_tasks, analysis_db_ops, user_id, task_id, i
         )     
         await clear_taskstorage(user_id, task_id)
 
+
 async def task_callback(user_id, task_id, index, isFailed, duration, image=None, model=None):
     logger.info(f"Image Generation index: [{index}], took -> {duration.total_seconds():.2f} seconds")
-    task_info = await get_redis_task(user_id, task_id)
-    if task_info:
-        if 'image_status' not in task_info:
-            task_info['image_status'] = {}
-        if 'time_taken' not in task_info:
-            task_info['time_taken'] = {}
-        if 'image' not in task_info:
-            task_info['image'] = {}
+    redis = get_redis_database()
+    lock_key = f"lock:{user_id}:{task_id}"
+    
+    try:
+        lock = await redis.setnx(lock_key, "locked")
+        if lock:
+            try:
+                await redis.expire(lock_key, 10)  # Set an expiration to avoid deadlock
 
-        # print('here', index, isFailed)
-        if image is not None and model is not None:
-            task_info['image'][index] = (index, image, model)
+                task_info = await get_redis_task(user_id, task_id)
+                if task_info:
+                    if 'image_status' not in task_info:
+                        task_info['image_status'] = {}
+                    if 'time_taken' not in task_info:
+                        task_info['time_taken'] = {}
+                    if 'image' not in task_info:
+                        task_info['image'] = {}
 
-        task_info['time_taken'][index] = f"{duration.total_seconds():.2f} seconds"
-        task_info['image_status'][index] = 'completed' if not isFailed else 'failed'
-        
-        await set_redis_task(user_id, task_id, task_info)
+                    if image is not None and model is not None:
+                        task_info['image'][index] = (index, image, model)
+
+                    task_info['time_taken'][index] = f"{duration.total_seconds():.2f} seconds"
+                    task_info['image_status'][index] = 'completed' if not isFailed else 'failed'
+                    
+                    await set_redis_task(user_id, task_id, task_info)
+            except Exception as e:
+                logger.info('Redis - setting data error (1)', str(e))
+            finally:
+                await redis.delete(lock_key)
+        else:
+            logger.warning("Failed to acquire lock, retrying...")
+            await asyncio.sleep(1)
+            await task_callback(user_id, task_id, index, isFailed, duration, image, model)
+    except Exception as e:
+        logger.info('Redis - setting data error (2)', str(e))
+    finally:
+        pass
 
 async def generate_prompts(prompt: str):
     
@@ -242,11 +263,33 @@ async def handle_image_generation(task_id, image_tasks, user_id):
     await asyncio.gather(*image_tasks, return_exceptions=True)
     duration = datetime.now() - start
     logger.info(f"Success - Total image Generation took -> {duration.total_seconds():.2f} seconds")
-    task_info = await get_redis_task(user_id, task_id)
-    if task_info:
-        task_info["status"] = "completed"
-        task_info["total_time_taken"] = f"{duration.total_seconds():.2f} seconds"
-        await set_redis_task(user_id, task_id, task_info)
+    
+    redis = get_redis_database()
+    lock_key = f"lock:{user_id}:{task_id}"
+    try:
+        lock = await redis.setnx(lock_key, "locked")
+        if lock:
+            try:
+                await redis.expire(lock_key, 10)  # Set an expiration to avoid deadlock
+                
+                task_info = await get_redis_task(user_id, task_id)
+                if task_info:
+                    task_info["status"] = "completed"
+                    task_info["total_time_taken"] = f"{duration.total_seconds():.2f} seconds"
+                    await set_redis_task(user_id, task_id, task_info)
+
+            except Exception as e:
+                logger.info('Redis - setting data error (3)', str(e))
+            finally:
+                await redis.delete(lock_key)
+        else:
+            logger.warning("Failed to acquire lock, retrying...")
+            await asyncio.sleep(1)
+            await task_callback(user_id, task_id, index, isFailed, duration, image, model)
+    except Exception as e:
+        logger.info('Redis - setting data error (4)', str(e))
+    finally:
+        pass
         
 @imagen_router.post("/get_image")
 async def get_generated_image(
@@ -298,8 +341,6 @@ async def get_generated_image(
         if task_info['status'] == 'completed' or (image_status != None and (image_status[str(request.idx)] == 'completed' or image_status[str(request.idx + 3)] == 'completed')):
             images = task_info['image']
             if images and images != None:
-                # for i in images:
-                #     print(i, len(images[i]), type(i), type(images[i]))
                 primary_image = images[str(request.idx)] if str(request.idx) in images else None
                 if isinstance(primary_image, Exception) or primary_image == None:
                     secondary_image = images[str(request.idx+3)] if str(request.idx+3) in images else None
