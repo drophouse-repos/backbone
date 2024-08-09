@@ -43,19 +43,19 @@ class TitanImageGenerator(ImageGenerator):
             base64_bytes = base64_image.encode('ascii')
             image_bytes = base64.b64decode(base64_bytes)
             duration = datetime.now() - start
-            callback(user_id, task_id, idx, False, duration, base64.b64encode(image_bytes).decode('utf-8'), 'titan')
+            await callback(user_id, task_id, idx, False, duration, base64.b64encode(image_bytes).decode('utf-8'), 'titan')
             return idx, base64.b64encode(image_bytes).decode('utf-8'), 'titan'
         except ClientError as e:
             duration = datetime.now() - start
-            callback(user_id, task_id, idx, True, duration)
+            await callback(user_id, task_id, idx, True, duration)
             return handle_boto3_error(e)
         except BotoCoreError as e:
             duration = datetime.now() - start
-            callback(user_id, task_id, idx, True, duration)
+            await callback(user_id, task_id, idx, True, duration)
             raise HTTPException(status_code=500, detail={'message':f"AWS Botocore Error: {str(e)}",'currentFrame': getframeinfo(currentframe()), 'detail': str(traceback.format_exc())})
         except Exception as e:
             duration = datetime.now() - start
-            callback(user_id, task_id, idx, True, duration)
+            await callback(user_id, task_id, idx, True, duration)
             raise HTTPException(status_code=500, detail={'message':f"generate with bedrock error{str(e)}",'currentFrame': getframeinfo(currentframe()), 'detail': str(traceback.format_exc())})
         
     def invoke_model_with_args(self, bedrock, byte_body, accept, content_type):
