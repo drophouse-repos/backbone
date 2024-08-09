@@ -8,7 +8,7 @@ import json
 from typing import Callable
 import uuid
 import openai
-from fastapi import APIRouter, HTTPException, BackgroundTasks  # , Request
+from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from openai import AsyncOpenAI, OpenAI
 from dotenv import load_dotenv
@@ -30,12 +30,11 @@ from utils.error_check import handle_openai_error
 from utils.record_images import record_prompt_and_image
 from utils.save_analysis import save_analysis
 from verification import verify_id_token
-import json
 from botocore.client import Config
 import asyncio
-import threading
 from email_service.EmailService import EmailService
 from profanity_check import predict, predict_prob
+from redis import get_redis_database
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
@@ -62,63 +61,69 @@ class ImageRequest(BaseModel):
 
 key = os.environ.get("OPENAI_KEY")
 client = AsyncOpenAI(api_key=key)
-task_storage = {}
-
-## TODO: add a timeout for each task. 
 def get_ai_model(class_type: type[ImageGenerator]) -> Callable:
     def dependency():
         return class_type()
     return dependency
 
-@imagen_router.post("/task_storage_analytics")
-def get_task_num():
-    activeTasks = 0
-    for user_id in task_storage:
-        if user_id in task_storage:
-            activeTasks = activeTasks + len(task_storage[user_id])
-    return f"Active Users Count: {len(task_storage)}, Active Tasks Count: {activeTasks}" 
+async def set_redis_task(user_id, task_id, task_info):
+    redis = get_redis_database()
+    await redis.hset(f"user:{user_id}:tasks", task_id, json.dumps(task_info))
+
+async def get_redis_task(user_id, task_id):
+    redis = get_redis_database()   
+    task_info = await redis.hget(f"user:{user_id}:tasks", task_id)
+    return json.loads(task_info) if task_info else None
+
+async def delete_redis_task(user_id, task_id):
+    redis = get_redis_database()   
+    await redis.hdel(f"user:{user_id}:tasks", task_id)
+
+async def clear_taskstorage(user_id, task_id):
+    redis = get_redis_database()   
+    await delete_redis_task(user_id, task_id)
 
 task_timeout = 600 
-def clear_taskstorage(user_id, task_id):
-    if user_id and task_id:
-        if user_id in task_storage and task_id in task_storage[user_id]:
-            del task_storage[user_id][task_id]
+async def schedule_task_deletion(user_id, task_id, task_timeout):
+    await asyncio.sleep(task_timeout)
+    await clear_taskstorage(user_id, task_id)
 
-        if user_id in task_storage and len(task_storage[user_id]) == 0:
-            del task_storage[user_id]
-
-def record_analysis(background_tasks, analysis_db_ops, user_id, task_id, idx):
-    if user_id in task_storage and task_id in task_storage[user_id]:
+async def record_analysis(background_tasks, analysis_db_ops, user_id, task_id, idx):
+    task_info = await get_redis_task(user_id, task_id)
+    if task_info:
         analysis_data = AnalysisModel(
                 task_id= task_id,
                 index= idx,
-                time_taken= json.dumps(task_storage[user_id][task_id]['time_taken']),
-                prompts= task_storage[user_id][task_id]['prompts'],
-                status= json.dumps(task_storage[user_id][task_id]['image_status'])
+                time_taken= json.dumps(task_info['time_taken'] if 'time_taken' in task_info else {}),
+                prompts= task_info['prompts'],
+                status= json.dumps(task_info['image_status'])
             )
         background_tasks.add_task(
             save_analysis,
             analysis= analysis_data,
             db_ops=analysis_db_ops
         )     
-        del task_storage[user_id][task_id]
+        await clear_taskstorage(user_id, task_id)
 
-def task_callback(user_id, task_id, index, isFailed, duration, image=None, model=None):
+async def task_callback(user_id, task_id, index, isFailed, duration, image=None, model=None):
     logger.info(f"Image Generation index: [{index}], took -> {duration.total_seconds():.2f} seconds")
-    if user_id in task_storage and task_id in task_storage[user_id]:
-        if 'image_status' not in task_storage[user_id][task_id]:
-            task_storage[user_id][task_id]['image_status'] = {}
-        if 'time_taken' not in task_storage[user_id][task_id]:
-            task_storage[user_id][task_id]['time_taken'] = {}
-        if 'image' not in task_storage[user_id][task_id]:
-            task_storage[user_id][task_id]['image'] = {}
+    task_info = await get_redis_task(user_id, task_id)
+    if task_info:
+        if 'image_status' not in task_info:
+            task_info['image_status'] = {}
+        if 'time_taken' not in task_info:
+            task_info['time_taken'] = {}
+        if 'image' not in task_info:
+            task_info['image'] = {}
 
-        task_storage[user_id][task_id]['time_taken'][index] = f"{duration.total_seconds():.2f} seconds"
-        task_storage[user_id][task_id]['image_status'][index] = 'completed' if not isFailed else 'failed'
-        if image != None and model != None:
-            task_storage[user_id][task_id]['image'][index] = (index, image, model)
-        if not task_storage[user_id][task_id]["events"][index].is_set():
-            task_storage[user_id][task_id]["events"][index].set()
+        # print('here', index, isFailed)
+        if image is not None and model is not None:
+            task_info['image'][index] = (index, image, model)
+
+        task_info['time_taken'][index] = f"{duration.total_seconds():.2f} seconds"
+        task_info['image_status'][index] = 'completed' if not isFailed else 'failed'
+        
+        await set_redis_task(user_id, task_id, task_info)
 
 async def generate_prompts(prompt: str):
     
@@ -209,22 +214,19 @@ async def generate_text(request: AskGPTRequest,
         handle_image_generation(task_id, image_tasks, user_id),
             name=f"image-gen-{task_id}" 
         )
-        if user_id not in task_storage :
-            task_storage[user_id] = {}
 
-        task_storage[user_id][task_id] = {
-            "task": task,
-            "prompts": enhanced_prompts,
+        task_info = {
             "status": "processing",
-            "images": None
+            "prompts": enhanced_prompts
         }
-        task_storage[user_id][task_id]["events"] = {}
+        task_info["image_status"] = {}
         for i in range(len(enhanced_prompts)):
-            task_storage[user_id][task_id]["events"][i] = asyncio.Event()
-            task_storage[user_id][task_id]["events"][i+3] = asyncio.Event()
+            task_info["image_status"][i] = 'processing'
+            task_info["image_status"][i+3] = 'processing'
 
-        timer = threading.Timer(task_timeout, clear_taskstorage, args=(user_id, task_id))
-        timer.start()
+        await set_redis_task(user_id, task_id, task_info)
+
+        asyncio.create_task(schedule_task_deletion(user_id, task_id, task_timeout))
         response_json['task_id'] = task_id
         return {"response": response_json}
     except openai.OpenAIError as e:
@@ -237,24 +239,14 @@ async def generate_text(request: AskGPTRequest,
 
 async def handle_image_generation(task_id, image_tasks, user_id):
     start = datetime.now()
-    try:
-        await asyncio.gather(*image_tasks, return_exceptions=True)
-        duration = datetime.now() - start
-        logger.info(f"Success - Total image Generation took -> {duration.total_seconds():.2f} seconds")
-        if user_id in task_storage and task_id in task_storage[user_id]:
-            task_storage[user_id][task_id]["status"] = "completed"
-            task_storage[user_id][task_id]["total_time_taken"] = f"{duration.total_seconds():.2f} seconds"
-    except asyncio.CancelledError:
-        duration = datetime.now() - start
-        logger.info(f"Cancelled - Total image Generation took -> {duration.total_seconds():.2f} seconds")
-    except Exception as e:
-        logger.error(f"Error during image generation: {str(e)}", exc_info=True)
-        duration = datetime.now() - start
-        logger.info(f"Failed - Total Image Generation took -> {duration.total_seconds():.2f} seconds")
-        if user_id in task_storage and task_id in task_storage[user_id]:
-            task_storage[user_id][task_id]["status"] = "failed"
-            task_storage[user_id][task_id]["total_time_taken"] = f"{duration.total_seconds():.2f} seconds"
-        raise HTTPException(status_code=500, detail={'message':f"Error during image generation: {str(e)}", 'currentFrame': getframeinfo(currentframe()), 'detail': str(traceback.format_exc())})
+    await asyncio.gather(*image_tasks, return_exceptions=True)
+    duration = datetime.now() - start
+    logger.info(f"Success - Total image Generation took -> {duration.total_seconds():.2f} seconds")
+    task_info = await get_redis_task(user_id, task_id)
+    if task_info:
+        task_info["status"] = "completed"
+        task_info["total_time_taken"] = f"{duration.total_seconds():.2f} seconds"
+        await set_redis_task(user_id, task_id, task_info)
         
 @imagen_router.post("/get_image")
 async def get_generated_image(
@@ -266,64 +258,54 @@ async def get_generated_image(
 ):
     try:
         photo = None
-        if user_id not in task_storage or request.task_id not in task_storage[user_id]:
-            raise HTTPException(status_code=404, detail={'message':"Task not found",'currentFrame': getframeinfo(currentframe())})
-
-        user_tasks = task_storage.get(user_id)
-        task_info = user_tasks.get(request.task_id)
-        image_status = task_info.get('image_status')
-
+        task_id = request.task_id
+        task_info = await get_redis_task(user_id, task_id)
         if not task_info:
-            raise HTTPException(status_code=404, detail={'message':"Task not found",'currentFrame': getframeinfo(currentframe())})
+            raise HTTPException(status_code=400, detail={'message':"Please try again",'currentFrame': getframeinfo(currentframe())})
+
+        image_status = task_info['image_status']
         if task_info['status'] == 'processing':
-            if image_status != None and (image_status.get(request.idx) == 'completed' and image_status.get(request.idx + 3) == 'completed'):
-                task_info['task'].cancel()
+            if image_status != None and (image_status[str(request.idx)] == 'completed' and image_status[str(request.idx + 3)] == 'completed'):
+                pass
             else:
-                event_task1 = asyncio.create_task(
-                    task_storage[user_id][request.task_id]["events"].get(request.idx).wait()
-                )
-                event_task2 = asyncio.create_task(
-                    task_storage[user_id][request.task_id]["events"].get(request.idx+3).wait()
-                )
-                
-                try:
-                    await asyncio.wait([event_task1, task_info['task']], return_when=asyncio.FIRST_COMPLETED)
-                    image_status = task_info.get('image_status')
-                    if user_id not in task_storage or request.task_id not in task_storage[user_id]:
-                        raise HTTPException(status_code=404, detail={'message':"Task not found",'currentFrame': getframeinfo(currentframe())})
-                    if task_storage[user_id][request.task_id]["events"][request.idx].is_set() and image_status != None and image_status.get(request.idx) == 'completed':
-                        task_info['task'].cancel()
-                        if not task_storage[user_id][request.task_id]["events"][request.idx+3].is_set():
-                            event_task2.cancel()
-                    if (image_status == None or image_status.get(request.idx) == None or image_status.get(request.idx) == 'failed'):
-                        await asyncio.wait([event_task2, task_info['task']], return_when=asyncio.FIRST_COMPLETED)
-                        image_status = task_info.get('image_status')
-                        if task_storage[user_id][request.task_id]["events"][request.idx+3].is_set():
-                            task_info['task'].cancel()
-                        if (image_status == None or image_status.get(request.idx + 3) == None or image_status.get(request.idx + 3) == 'failed'):
-                            record_analysis(background_tasks, analysis_db_ops, user_id, request.task_id, request.idx)
-                            raise HTTPException(status_code=400, detail={'message':"Prompt Violates Our Content Policy",'currentFrame': getframeinfo(currentframe())})
-                except asyncio.CancelledError:
-                    pass 
-                except HTTPException as http_exc:
-                    raise http_exc
-                except Exception as e:
-                    record_analysis(background_tasks, analysis_db_ops, user_id, request.task_id, request.idx)
-                    raise HTTPException(status_code=500, detail={'message':f"Error during image generation: {str(e)}", 'currentFrame': getframeinfo(currentframe()), 'detail': str(traceback.format_exc())})
-                
-                user_tasks = task_storage.get(user_id)
-                task_info = user_tasks.get(request.task_id)
-                image_status = task_info.get('image_status')
-        
-        if task_info['status'] == 'completed' or (image_status != None and (image_status.get(request.idx) == 'completed' or image_status.get(request.idx + 3) == 'completed')):
-            images = task_info.get('image')
+                counter = 0
+                max_wait = 60 # worst case wait for 60 seconds
+                while (
+                    task_info != None and
+                    task_info['status'] == 'processing' and
+                    (
+                        image_status[str(request.idx)] == "processing" or
+                        image_status[str(request.idx + 3)] == 'processing'
+                    ) and
+                    counter < max_wait
+                ):
+                    counter = counter + 1
+                    await asyncio.sleep(1)
+                    task_info = await get_redis_task(user_id, task_id)
+                    if task_info:
+                        image_status = task_info['image_status']
+
+                task_info = await get_redis_task(user_id, task_id)
+                if not task_info:
+                    raise HTTPException(status_code=400, detail={'message':"Please try again",'currentFrame': getframeinfo(currentframe())})
+                image_status = task_info['image_status']
+
+        if task_info['status'] == 'processing' and (image_status != None and (image_status[str(request.idx)] == 'failed' and image_status[str(request.idx + 3)] == 'failed')):
+            logger.error(f"Both primary and secondary images failed to generate: Prompt Violates Our Content Policy (1)", exc_info=True)
+            await record_analysis(background_tasks, analysis_db_ops, user_id, request.task_id, request.idx)
+            raise HTTPException(status_code=400, detail={'message':"Prompt Violates Our Content Policy",'currentFrame': getframeinfo(currentframe())})
+
+        if task_info['status'] == 'completed' or (image_status != None and (image_status[str(request.idx)] == 'completed' or image_status[str(request.idx + 3)] == 'completed')):
+            images = task_info['image']
             if images and images != None:
-                primary_image = images.get(request.idx)
+                # for i in images:
+                #     print(i, len(images[i]), type(i), type(images[i]))
+                primary_image = images[str(request.idx)] if str(request.idx) in images else None
                 if isinstance(primary_image, Exception) or primary_image == None:
-                    secondary_image = images.get(request.idx+3)
+                    secondary_image = images[str(request.idx+3)] if str(request.idx+3) in images else None
                     if isinstance(secondary_image, Exception) or secondary_image == None:
-                        logger.error(f"Both primary and fallackb images failed to generate: {secondary_image}", exc_info=True)
-                        record_analysis(background_tasks, analysis_db_ops, user_id, request.task_id, request.idx)
+                        logger.error(f"Both primary and secondary images failed to generate: Prompt Violates Our Content Policy (2)", exc_info=True)
+                        await record_analysis(background_tasks, analysis_db_ops, user_id, request.task_id, request.idx)
                         raise HTTPException(status_code=400, detail={'message':"Prompt Violates Our Content Policy",'currentFrame': getframeinfo(currentframe())})
                     else:
                         photo = {"idx": request.idx + 3, "photo": secondary_image[1], "name": secondary_image[2]}
@@ -342,16 +324,16 @@ async def get_generated_image(
                     db_ops=db_ops,
                     user_id=user_id,
                 )
-                record_analysis(background_tasks, analysis_db_ops, user_id, request.task_id, request.idx)
+                await record_analysis(background_tasks, analysis_db_ops, user_id, request.task_id, request.idx)
                 return {"photo": photo['photo'], "img_id": img_id}
             else:
-                record_analysis(background_tasks, analysis_db_ops, user_id, request.task_id, request.idx)
+                await record_analysis(background_tasks, analysis_db_ops, user_id, request.task_id, request.idx)
                 raise HTTPException(status_code=400, detail={'message':"Images not found",'currentFrame': getframeinfo(currentframe())})
         elif task_info['status'] == 'failed':
-            record_analysis(background_tasks, analysis_db_ops, user_id, request.task_id, request.idx)
+            await record_analysis(background_tasks, analysis_db_ops, user_id, request.task_id, request.idx)
             raise HTTPException(status_code=500, detail={'message':"Image generation failed",'currentFrame': getframeinfo(currentframe())})
         else:
-            record_analysis(background_tasks, analysis_db_ops, user_id, request.task_id, request.idx)
+            await record_analysis(background_tasks, analysis_db_ops, user_id, request.task_id, request.idx)
             raise HTTPException(status_code=500, detail={'message':"Unexpected task status",'currentFrame': getframeinfo(currentframe())})
     except openai.OpenAIError as e:
         handle_openai_error(e)
@@ -359,7 +341,7 @@ async def get_generated_image(
         raise http_exc
     except Exception as e:
         logger.error(f"Error in get_image: {str(e)}", exc_info=True)
-        record_analysis(background_tasks, analysis_db_ops, user_id, request.task_id, request.idx)
+        await record_analysis(background_tasks, analysis_db_ops, user_id, request.task_id, request.idx)
         raise HTTPException(status_code=500, detail={'message':f"Internal Server Error: {str(e)}", 'currentFrame': getframeinfo(currentframe()), 'detail': str(traceback.format_exc())})
 
 @imagen_router.post("/store_prompt")
@@ -386,6 +368,3 @@ def validate_structure(response_str):
         return False, f"Invalid JSON: {str(e)}"
     except Exception as e:
         return False, f"An error occurred: {str(e)}"
-
-
-
