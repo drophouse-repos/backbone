@@ -30,7 +30,7 @@ class ShippingOperations(BaseDatabaseOperation):
         # print("state code : ",location)
         # print("state code from api : ",state_code)
         # print("zip code from api : ",zipcode)
-        return location.postal_code == zipcode
+        return location.state_name == state_code
 
     async def update(self, user_id: str, shipping_info: ShippingModel):
         try:
