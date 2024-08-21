@@ -36,6 +36,9 @@ class ShippingModel(BaseModel):
     city: Annotated[str, StringConstraints(min_length=1)] = Field(
         ..., alias="city", description="City is required."
     )
+    country: Annotated[str, StringConstraints(min_length=1)] = Field(
+        ..., alias="country", description="Country is required."
+    )
     stateProvince: Annotated[str, StringConstraints(min_length=1)] = Field(
         ..., alias="stateProvince", description="State/Province is required."
     )

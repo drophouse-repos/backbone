@@ -54,7 +54,7 @@ async def create_student_checkout(
             raise HTTPException(status_code=422, detail={'message':"You have already placed an order. Contact us if you want to change it", 'currentFrame': getframeinfo(currentframe())})
 
         shipping_info_meta = CheckoutModel.shipping_info,
-        org_id = CheckoutModel.org_id,
+        org_id = CheckoutModel.org_id
         org_name = CheckoutModel.org_name
         print(org_name)
         for item in CheckoutModel.products:
@@ -145,7 +145,7 @@ async def create_checkout_session(
     line_items = []  
     total_purchase_price = 0
     priceMap = await price_db_ops.get()
-    org_id = CheckoutModel.org_id,
+    org_id = CheckoutModel.org_id
     org_name = CheckoutModel.org_name
     print(org_name)
     for item in CheckoutModel.products:

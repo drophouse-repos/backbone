@@ -26,7 +26,7 @@ def generate_presigned_url(object_name, bucket_name, expiration=3600):
     except ClientError as e:
         logging.error(e)
         return None
-    print(object_name)
+    # print(object_name)
     return response
 
 
