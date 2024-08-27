@@ -21,18 +21,20 @@ class ShippingOperations(BaseDatabaseOperation):
             logger.critical(f"Error saving shipping info: {e}")
             return False
 
-    async def validate_zipcode_with_api(self, state_code: str, zipcode: str):
-        nomi = pgeocode.Nominatim('us')
+    async def validate_zipcode_with_api(self,country: str, state_code: str, zipcode: str):
+        nomi = pgeocode.Nominatim(country)
         location = nomi.query_postal_code(zipcode)
         
         if location.empty:
             return False
-        
-        return location.state_code == state_code
+        # print("state code : ",location)
+        # print("state code from api : ",state_code)
+        # print("zip code from api : ",zipcode)
+        return location.state_name == state_code
 
     async def update(self, user_id: str, shipping_info: ShippingModel):
         try:
-            isMatched = await self.validate_zipcode_with_api(shipping_info.stateProvince, shipping_info.postalZipcode)
+            isMatched = await self.validate_zipcode_with_api(shipping_info.country, shipping_info.stateProvince, shipping_info.postalZipcode)
             if not isMatched:
                 raise ValueError("State - zipcode doesn't match")
 

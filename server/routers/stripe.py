@@ -147,7 +147,7 @@ async def create_checkout_session(
     line_items = []  
     total_purchase_price = 0
     priceMap = await price_db_ops.get()
-    org_id = CheckoutModel.org_id,
+    org_id = CheckoutModel.org_id
     org_name = CheckoutModel.org_name
     print(org_name)
     for item in CheckoutModel.products:
