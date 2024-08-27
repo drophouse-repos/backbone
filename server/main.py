@@ -24,6 +24,7 @@ from routers import (
 import uvicorn
 import logging
 from db import connect_to_mongo, close_mongo_connection
+from redis import connect_to_redis, close_redis_connection
 import firebase_admin
 from firebase_admin import credentials
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -81,7 +82,9 @@ def root():
     return {"message": "Welcome to the New Order!!!"}
 
 app.add_event_handler("startup", connect_to_mongo)
+app.add_event_handler("startup", connect_to_redis)
 app.add_event_handler("shutdown", close_mongo_connection)
+app.add_event_handler("shutdown", close_redis_connection)
 app.include_router(auth_router)
 app.include_router(imagen_router)
 app.include_router(favorite_router)
