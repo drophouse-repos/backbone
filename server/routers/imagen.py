@@ -70,14 +70,25 @@ async def set_redis_task(user_id, task_id, task_info):
     redis = get_redis_database()
     await redis.hset(f"user:{user_id}:tasks", task_id, json.dumps(task_info))
 
+async def set_redis_images(user_id, task_id, index, task_info):
+    redis = get_redis_database()
+    await redis.hset(f"user:{user_id}:tasks:{task_id}:images", index, json.dumps(task_info))
+
 async def get_redis_task(user_id, task_id):
     redis = get_redis_database()   
     task_info = await redis.hget(f"user:{user_id}:tasks", task_id)
     return json.loads(task_info) if task_info else None
 
+async def get_redis_images(user_id, task_id, index):
+    redis = get_redis_database()   
+    task_info = await redis.hget(f"user:{user_id}:tasks:{task_id}:images", index)
+    return json.loads(task_info) if task_info else None
+
 async def delete_redis_task(user_id, task_id):
     redis = get_redis_database()   
     await redis.hdel(f"user:{user_id}:tasks", task_id)
+    for i in range(6):
+        await redis.hdel(f"user:{user_id}:tasks:{task_id}:images", str(i))
 
 async def clear_taskstorage(user_id, task_id):
     redis = get_redis_database()   
@@ -123,11 +134,12 @@ async def task_callback(user_id, task_id, index, isFailed, duration, image=None,
                         task_info['image_status'] = {}
                     if 'time_taken' not in task_info:
                         task_info['time_taken'] = {}
-                    if 'image' not in task_info:
-                        task_info['image'] = {}
+                    # if 'image' not in task_info:
+                        # task_info['image'] = {}
 
                     if image is not None and model is not None:
-                        task_info['image'][index] = (index, image, model)
+                        # task_info['image'][index] = (index, image, model)
+                        await set_redis_images(user_id, task_id, index, (index, image, model))
 
                     task_info['time_taken'][index] = f"{duration.total_seconds():.2f} seconds"
                     task_info['image_status'][index] = 'completed' if not isFailed else 'failed'
@@ -339,7 +351,11 @@ async def get_generated_image(
             raise HTTPException(status_code=400, detail={'message':"Prompt Violates Our Content Policy",'currentFrame': getframeinfo(currentframe())})
 
         if task_info['status'] == 'completed' or (image_status != None and (image_status[str(request.idx)] == 'completed' or image_status[str(request.idx + 3)] == 'completed')):
-            images = task_info['image']
+            images = {
+                str(request.idx): await get_redis_images(user_id, task_id, str(request.idx)),
+                str(request.idx+3): await get_redis_images(user_id, task_id, str(request.idx+3))
+            }
+            # images = task_info['image']
             if images and images != None:
                 primary_image = images[str(request.idx)] if str(request.idx) in images else None
                 if isinstance(primary_image, Exception) or primary_image == None:
