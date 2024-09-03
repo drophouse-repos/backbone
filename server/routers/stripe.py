@@ -63,6 +63,10 @@ async def create_student_checkout(
             thumbnail_img_id = "t_" + img_id
             if thumbnail and thumbnail.startswith("data:image"):
                 processAndSaveImage(thumbnail, thumbnail_img_id, "thumbnails-cart")
+                item.thumbnail = thumbnail_img_id
+            if item.toggled and item.toggled.startswith("data:image"):
+                processAndSaveImage(item.toggled, f"e_{item.img_id}", "browse-image-v2")
+                item.toggled = True
 
         items = CheckoutModel.products
         print(items)
@@ -156,7 +160,12 @@ async def create_checkout_session(
         thumbnail_img_id = "t_" + img_id
         if thumbnail and thumbnail.startswith("data:image"):
             processAndSaveImage(thumbnail, thumbnail_img_id, "thumbnails-cart")
+            item.thumbnail = thumbnail_img_id
             thumbnail = generate_presigned_url(thumbnail_img_id, "thumbnails-cart")
+        if item.toggled and item.toggled.startswith("data:image"):
+            processAndSaveImage(item.toggled, f"e_{item.img_id}", "browse-image-v2")
+            item.toggled = True
+        
         color = await capitalize_first_letter(item.color)
         apparel = await capitalize_first_letter(item.apparel)
         if item.apparel.lower() not in priceMap: # Apparel Price not found
