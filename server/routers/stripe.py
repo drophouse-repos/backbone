@@ -227,7 +227,7 @@ async def create_checkout_session(
             line_items=line_items,
             mode="payment",
             success_url=frontend_url + "/success",
-            cancel_url=frontend_url + "/product",
+            cancel_url=frontend_url + "/information",
             #automatic_tax={'enabled': True},
             expires_at=int(time.time()) + 3600,
             allow_promotion_codes=True,
