@@ -24,6 +24,7 @@ from routers import (
 import uvicorn
 import logging
 from db import connect_to_mongo, close_mongo_connection
+from redis import connect_to_redis, close_redis_connection
 import firebase_admin
 from firebase_admin import credentials
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -39,7 +40,7 @@ app = FastAPI()
 email_service = EmailService()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://drophouse.vercel.app", "https://superman-kappa.vercel.app", "https://staging-fe-v2.vercel.app", "https://drophouse.rose-hulman.edu", "https://student-model-rose.vercel.app", "https://drophouse-student.rose-hulman.edu", "https://demo.drophouse.ai", "https://drophouse.ai"],
+    allow_origins=["http://localhost:3000", "https://drophouse.vercel.app", "https://superman-kappa.vercel.app", "https://staging-fe-v2.vercel.app", "https://drophouse.rose-hulman.edu", "https://nutrastack.vercel.app", "https://drophouse-student.rose-hulman.edu", "https://demo.drophouse.ai", "https://drophouse.ai", "https://omaha-drophouse.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -81,7 +82,9 @@ def root():
     return {"message": "Welcome to the New Order!!!"}
 
 app.add_event_handler("startup", connect_to_mongo)
+app.add_event_handler("startup", connect_to_redis)
 app.add_event_handler("shutdown", close_mongo_connection)
+app.add_event_handler("shutdown", close_redis_connection)
 app.include_router(auth_router)
 app.include_router(imagen_router)
 app.include_router(favorite_router)

@@ -18,10 +18,12 @@ from aws_utils import generate_presigned_url, processAndSaveImage
 from database.OrderOperations import OrderOperations
 from database.UserOperations import UserOperations
 from database.CartOperations import CartOperations
+from database.LikedImageOperations import LikedImageOperations
 from database.PricesOperations import PricesOperations
 from routers.cart import remove_from_cart
 from email_service.EmailService import EmailService
 from utils.stripe_utils import capitalize_first_letter
+from utils.update_like import unlike_image
 from verification import verify_id_token
 from routers.order_info import PlaceOrderDataRequest, place_order
 load_dotenv()
@@ -34,8 +36,6 @@ stripe_webhook_key = os.environ.get("STRIPE_WEBHOOK_SECRET")
 stripe_tax_id = os.environ.get("STRIPE_TAX_ID")
 
 stripe_router = APIRouter()
-
-frontend_url = os.environ.get("FRONTEND_DOMAIN")
 freeShipping = int(os.environ.get("FREE_SHIPPING_THRESHOLD")) if os.environ.get("FREE_SHIPPING_THRESHOLD") else 100
 
 @stripe_router.post("/create-student-checkout")
@@ -66,8 +66,9 @@ async def create_student_checkout(
 
         items = CheckoutModel.products
         print(items)
+        await order_db_ops.remove_unpaid_order(user_id)
         order_data_request = PlaceOrderDataRequest(shipping_info=shipping_info_meta, item=items)
-        order_id = await place_order(order_data_request, user_id, 'student',org_id, org_name, order_db_ops)
+        order_id = await place_order(order_data_request, user_id, org_id, org_name, order_db_ops)
         
         order_model = await order_db_ops.getByOrderID(order_id)
         priceMap = await price_db_ops.get()
@@ -136,6 +137,7 @@ async def create_student_checkout(
 
 @stripe_router.post("/create-checkout-session")
 async def create_checkout_session(
+    request : Request,
     CheckoutModel: CheckoutModel,
     order_db_ops: BaseDatabaseOperation = Depends(get_db_ops(OrderOperations)),
     price_db_ops: BaseDatabaseOperation = Depends(get_db_ops(PricesOperations)),
@@ -190,13 +192,12 @@ async def create_checkout_session(
         items = CheckoutModel.products
         org_id = CheckoutModel.org_id
         org_name = str(CheckoutModel.org_name)
-        print("Org Name : ",str(org_name))
+        await order_db_ops.remove_unpaid_order(user_id)
         order_data_request = PlaceOrderDataRequest(shipping_info=shipping_info_meta, item=items)
-        order_id = await place_order(order_data_request, user_id, 'alumni',org_id, org_name, order_db_ops)
+        order_id = await place_order(order_data_request, user_id, org_id, org_name, order_db_ops)
         encrypt_model = await salt_db_ops.create_and_encrypt(order_id)
         encrypt_id = encrypt_model.salt_id
         encrypted_oid = encrypt_model.encrypted_data
-        await order_db_ops.remove_unpaid_order(user_id)
         
         shipping_option = {
                     'shipping_rate_data': {
@@ -220,7 +221,8 @@ async def create_checkout_session(
                         # }
                     }
                 }
-        
+
+        frontend_url = request.headers.get('origin')
         checkout_session = stripe.checkout.Session.create(
             payment_method_types=["card"],
             customer_email=user_email,
@@ -269,6 +271,7 @@ async def stripe_webhook(
     order_db_ops: BaseDatabaseOperation = Depends(get_db_ops(OrderOperations)),
     cart_db_ops: BaseDatabaseOperation = Depends(get_db_ops(CartOperations)),
     price_db_ops: BaseDatabaseOperation = Depends(get_db_ops(PricesOperations)),
+    like_db_ops: BaseDatabaseOperation = Depends(get_db_ops(LikedImageOperations)),
     salt_db_ops: BaseDatabaseOperation = Depends(get_db_ops(SaltOperations))):
     webhook_secret = stripe_webhook_key
     request_data = await request.body()
@@ -359,10 +362,15 @@ async def stripe_webhook(
                 logger.info(f"Successfully removed item {img_id} from cart for user {uid}.")
             else:
                 logger.info(f"Item {img_id} not found in cart for user {uid}.")
+
+            like_result = await unlike_image(uid, img_id, 'remove', like_db_ops)
+            if like_result:
+                logger.info(f"Successfully removed item {img_id} from favorites/liked for user {uid}.")
+            else:
+                logger.info(f"Item {img_id} not found in favorites/liked for user {uid}.")
+
         await order_db_ops.update_order_status(uid, order_id, 'pending')
         logger.info(f"Handled event type: {event['type']}")
     else:
         logger.info(f"Unhandled event type {event['type']}")
     return JSONResponse({"status": "success"})
-
-

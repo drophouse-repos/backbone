@@ -19,9 +19,9 @@ class OpenAIImageGenerator(ImageGenerator):
 			)
 
 			duration = datetime.now() - start
-			callback(user_id, task_id, idx, False, duration, response.data[0].b64_json, 'openai')
+			await callback(user_id, task_id, idx, False, duration, response.data[0].b64_json, 'openai')
 			return idx, response.data[0].b64_json, 'openai'
 		except openai.OpenAIError as e:
 			duration = datetime.now() - start
-			callback(user_id, task_id, idx, True, duration)
+			await callback(user_id, task_id, idx, True, duration)
 			raise HTTPException(status_code=500, detail={'message':f"OpenAI Error: {str(e)}",'currentFrame': getframeinfo(currentframe()), 'detail': str(traceback.format_exc())})
