@@ -3,7 +3,7 @@
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'backbone-test-selvam'
+app = 'backbone-test-pradeep'
 primary_region = 'ewr'
 
 [env]
