@@ -40,6 +40,7 @@ freeShipping = int(os.environ.get("FREE_SHIPPING_THRESHOLD")) if os.environ.get(
 
 @stripe_router.post("/create-student-checkout")
 async def create_student_checkout(
+    request : Request,
     CheckoutModel: CheckoutModel,
     order_db_ops: BaseDatabaseOperation = Depends(get_db_ops(OrderOperations)),
     price_db_ops: BaseDatabaseOperation = Depends(get_db_ops(PricesOperations)),
