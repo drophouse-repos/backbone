@@ -45,3 +45,15 @@ class OrganizationOperation(BaseDatabaseOperation):
 		except Exception as e:
 			logger.error(f"Error retrieving prices: {e}")
 			return []
+
+	async def get_org_by_id(self, org_id: str) -> dict:
+		try:
+			org_data = await self.db.organizations.find_one({"org_id": org_id}, {'_id': 0})
+			if org_data:
+				return org_data
+			else:
+				logger.warning(f"No organization found with org_id: {org_id}")
+				return {}
+		except Exception as e:
+			logger.error(f"Error retrieving organization by ID: {e}")
+			return {}
