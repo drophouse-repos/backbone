@@ -21,8 +21,11 @@ from routers import (
     prices_router,
     org_router
 )
+import asyncio
 import uvicorn
 import logging
+import signal
+import sys
 from db import connect_to_mongo, close_mongo_connection
 from redis import connect_to_redis, close_redis_connection
 import firebase_admin
@@ -97,12 +100,33 @@ app.include_router(email_router)
 app.include_router(static_router)
 app.include_router(org_router)
 
+# Graceful shutdown handler
+async def grace_shutdown(signal, loop):
+    logger.info(f"Received signal {signal.name}, shutting down gracefully...")
+    await close_mongo_connection()  # Close MongoDB connection here
+    await close_redis_connection()  # Close Redis connection here
+    # Add any other shutdown cleanup logic (e.g., closing Redis if you're using it)
+    loop.stop()
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     error_details = json.dumps(exc.errors(), indent=2)
     print(error_details)
     return JSONResponse(status_code=422, content={"detail": exc.errors()})
 
-port = int(os.environ.get("SERVER_PORT")) if os.environ.get("SERVER_PORT") else 8080
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    loop = asyncio.get_event_loop()
+    
+    # Register signal handlers for graceful shutdown
+    signals = (signal.SIGINT, signal.SIGTERM)
+    for s in signals:
+        loop.add_signal_handler(s, lambda s=s: asyncio.create_task(grace_shutdown(s, loop)))
+
+    try:
+        port = int(os.environ.get("SERVER_PORT", 8080))
+        uvicorn.run(app, host="0.0.0.0", port=port)
+    except KeyboardInterrupt:
+        logger.info("Shutting down due to KeyboardInterrupt...")
+        loop.run_until_complete(close_mongo_connection())  # Ensure MongoDB closes
+    finally:
+        loop.close()
