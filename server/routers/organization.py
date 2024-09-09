@@ -42,6 +42,8 @@ async def create_organisation(
 class org_id(BaseModel):
     org_id: str
 
+class BucketRequest(BaseModel):
+    img_id: str
 
 @org_router.post("/get_organisation_by_id")
 async def get_organisation_by_id(
@@ -57,10 +59,11 @@ async def get_organisation_by_id(
 
 @org_router.post("/convert_bucketurl_to_base64")
 async def convert_bucketurl_to_base64(
-    img_id: str,
+    request: BucketRequest,
     db_ops: BaseDatabaseOperation = Depends(get_db_ops(OrganizationOperation)),
 ):
     try:
+        img_id = request.img_id
         presigned_url = generate_presigned_url(img_id, "drophouse-skeleton")
         response = requests.get(presigned_url)
         
