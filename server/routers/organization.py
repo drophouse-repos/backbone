@@ -61,7 +61,7 @@ async def convert_bucketurl_to_base64(
     db_ops: BaseDatabaseOperation = Depends(get_db_ops(OrganizationOperation)),
 ):
     try:
-        presigned_url = generate_presigned_url(img_id, "drophouse-skeleton-bucket")
+        presigned_url = generate_presigned_url(img_id, "drophouse-skeleton")
         response = requests.get(presigned_url)
         
         if response.status_code == 200:
