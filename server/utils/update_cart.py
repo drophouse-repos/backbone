@@ -14,6 +14,10 @@ async def add_to_cart(product_info: ItemModel, user_id: str, db_ops: CartOperati
         thumbnail = product_info.thumbnail
         thumbnail_id = f"t_{product_info.img_id}"
         processAndSaveImage(thumbnail, thumbnail_id, "thumbnails-cart")
+        if product_info.toggled and product_info.toggled.startswith("data:image"):
+            processAndSaveImage(product_info.toggled, f"e_{product_info.img_id}", "browse-image-v2")
+            product_info.toggled = True
+            
         product_info.thumbnail = thumbnail_id
         result = await db_ops.create(user_id, product_info)
         logger.info(f"Added to cart: {result}")
