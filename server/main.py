@@ -45,7 +45,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "https://drophouse.vercel.app", "https://superman-kappa.vercel.app", "https://staging-fe-v2.vercel.app", 
     "https://drophouse.rose-hulman.edu", "https://nutrastack.vercel.app", "https://drophouse-student.rose-hulman.edu", 
-    "https://demo.drophouse.ai", "https://drophouse.ai", "https://omaha-drophouse.vercel.app",
+    "https://demo.drophouse.ai", "https://drophouse.ai", "https://omaha-drophouse.vercel.app", "https://blue-energy.vercel.app",
     "https://rose-skeleton.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
