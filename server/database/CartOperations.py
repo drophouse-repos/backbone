@@ -44,6 +44,27 @@ class CartOperations(BaseDatabaseOperation):
             return []
 
 
+    async def get_cart_and_fav_number(self, user_id: str) -> dict:
+        try:
+            user = await self.db.users.find_one({"user_id": user_id}, {"cart": 1, "liked_images": 1})
+            count = {}
+            if user and "cart" in user:
+                cart = user["cart"]
+                count['cart_number'] = len(cart)
+            else:
+                count['cart_number'] = 0
+
+            if user and "liked_images" in user:
+                liked = user["liked_images"]
+                count['liked_number'] = len(liked)
+            else:
+                count['liked_number'] = 0
+
+            return count
+        except Exception as e:
+            logger.error(f"Error retrieving cart count: {e}")
+            return 0
+
     async def get_cart_number(self, user_id: str) -> int:
         try:
             user = await self.db.users.find_one({"user_id": user_id}, {"cart": 1})

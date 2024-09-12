@@ -101,6 +101,20 @@ async def get_cart_number(
         logger.error(f"Error in get cart number: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail={'message':"Internal Server Error", 'currentFrame': getframeinfo(currentframe()), 'detail': str(traceback.format_exc())})
 
+@cart_router.get("/get_cart_and_fav_number")
+async def get_cart_and_fav_number(
+    user_id: str = Depends(verify_id_token),
+    db_ops: BaseDatabaseOperation = Depends(get_db_ops(CartOperations)),
+):
+    try:
+        if not user_id:
+            raise HTTPException(status_code=401, detail={'message':"User ID is required.", 'currentFrame': getframeinfo(currentframe())})
+        result = await db_ops.get_cart_and_fav_number(user_id)
+        return {"cart_number": result['cart_number'], "liked_number": result['liked_number']}
+    except Exception as e:
+        logger.error(f"Error in get cart number: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail={'message':"Internal Server Error", 'currentFrame': getframeinfo(currentframe()), 'detail': str(traceback.format_exc())})
+
 @cart_router.get("/view_cart")
 async def view_cart(
     user_id: str = Depends(verify_id_token),
