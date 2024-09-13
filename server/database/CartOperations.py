@@ -63,7 +63,10 @@ class CartOperations(BaseDatabaseOperation):
             return count
         except Exception as e:
             logger.error(f"Error retrieving cart count: {e}")
-            return 0
+            return {
+                'liked_number': 0,
+                'cart_number': 0
+            }
 
     async def get_cart_number(self, user_id: str) -> int:
         try:

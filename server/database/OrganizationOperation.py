@@ -34,6 +34,30 @@ class OrganizationOperation(BaseDatabaseOperation):
 			logger.critical(f"Error in updating organization: {e}")
 			return False
 
+	async def get_live_count(self) -> dict:
+	    try:
+	        result = {
+	            'user_count': 0,
+	            'org_count': 0,
+	            'design_count': 0
+	        }
+
+	        users = await self.db.users.find({}, {"_id": 1, "browsed_images": 1}).to_list(length=None)
+	        if users:
+	            result['user_count'] = len(users)
+	            result['design_count'] = sum(len(user.get('browsed_images', [])) for user in users)
+
+	        result['org_count'] = await self.db.organizations.count_documents({})
+	        return result
+
+	    except Exception as e:
+	        logger.error(f"Error retrieving live counts: {e}")
+	        return {
+	            'user_count': 0,
+	            'org_count': 0,
+	            'design_count': 0
+	        }
+
 	async def get(self):
 		try:
 			org_data = await self.db.organizations.find({}, {'_id':0}).to_list(length=None)

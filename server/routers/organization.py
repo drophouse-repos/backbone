@@ -18,7 +18,7 @@ org_router = APIRouter()
 
 @org_router.post("/organisation_list")
 async def organisation_list(
-	db_ops: BaseDatabaseOperation = Depends(get_db_ops(OrganizationOperation)),
+    db_ops: BaseDatabaseOperation = Depends(get_db_ops(OrganizationOperation)),
 ):
 	try:
 		result = await db_ops.get()
@@ -26,6 +26,17 @@ async def organisation_list(
 	except Exception as e:
 		logger.error(f"Error in getting Organization: {str(e)}", exc_info=True)
 		raise HTTPException(status_code=500, detail={'message':"Internal Server Error", 'currentFrame': getframeinfo(currentframe()), 'detail': str(traceback.format_exc())})
+
+@org_router.post("/live_count")
+async def live_count(
+	db_ops: BaseDatabaseOperation = Depends(get_db_ops(OrganizationOperation)),
+):
+    try:
+        result = await db_ops.get_live_count()
+        return result;
+    except Exception as e:
+        logger.error(f"Error in getting live count: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail={'message':"Internal Server Error", 'currentFrame': getframeinfo(currentframe()), 'detail': str(traceback.format_exc())})
 
 @org_router.post("/create_organisation")
 async def create_organisation(
