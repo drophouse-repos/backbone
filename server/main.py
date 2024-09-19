@@ -47,7 +47,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "https://superman-kappa.vercel.app",
-        "https://staging-fe-v2.vercel.app",
+        "https://admin.drophouse.ai",
         "https://drophouse.rose-hulman.edu",
     ],
     allow_origin_regex=r".*\.drophouse\.ai$",
