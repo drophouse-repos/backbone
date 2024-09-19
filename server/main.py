@@ -33,6 +33,7 @@ from firebase_admin import credentials
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
+
 load_dotenv()
 cred = credentials.Certificate("service_firebase.json")
 firebase_admin.initialize_app(cred)
