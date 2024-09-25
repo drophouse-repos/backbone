@@ -90,6 +90,8 @@ class OrganizationOperation(BaseDatabaseOperation):
 						product['mask'] = convert_presigned_url_to_base64(generate_presigned_url(product['mask'], bucket_name))
 					if 'defaultProduct' in product and product['defaultProduct'] != None and product['defaultProduct'] != '' and 'data:image' not in product['defaultProduct']:
 						product['defaultProduct'] = convert_presigned_url_to_base64(generate_presigned_url(product['defaultProduct'], bucket_name))
+					# if 'greenmask' in product and product['greenmask'] != None and product['greenmask'] != '' and 'data:image' not in product['greenmask']:
+						# product['greenmask'] = convert_presigned_url_to_base64(generate_presigned_url(product['greenmask'], bucket_name))
 
 					for index in product['colors']:
 						if 'front' in product['colors'][index]['asset'] and product['colors'][index]['asset'] != None and product['colors'][index]['asset']['front'] != '' and 'data:image' not in product['colors'][index]['asset']:
