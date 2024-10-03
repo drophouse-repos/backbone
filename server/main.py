@@ -45,6 +45,7 @@ email_service = EmailService()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "http://localhost:3000",
         "https://drophouse.rose-hulman.edu",
     ],
     allow_origin_regex=r".*\.drophouse\.ai$",
