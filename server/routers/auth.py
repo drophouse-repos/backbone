@@ -194,6 +194,26 @@ async def saml_jwt(
 		logger.error(f"Error creating jwt token : {e}")
 		return False
 
+class fingerprint(BaseModel):
+    fingerprint: str
+
+@auth_router.post("/set-or-get-guest")
+async def setorget_guest(
+	request : fingerprint,
+    db_ops: BaseDatabaseOperation = Depends(get_db_ops(UserOperations))
+):
+    try:
+        result = await db_ops.get_or_set(request.fingerprint)
+        token = create_jwt_token(result['user_id'])
+        return {
+        	'user_data': result,
+        	'token': token
+        };
+    except Exception as e:
+        logger.error(f"Error in set-or-get-guest Organization: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail={'message':"Internal Server Error", 'currentFrame': getframeinfo(currentframe()), 'detail': str(traceback.format_exc())})
+
+
 async def init_saml_auth(req: Request):
 	request_data = {
 		'https': 'on',

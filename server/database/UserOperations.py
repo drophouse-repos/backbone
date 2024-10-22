@@ -3,13 +3,36 @@ import logging
 from database.BASE import BaseDatabaseOperation
 from models.OrderItemModel import OrderItem
 from aws_utils import generate_presigned_url
+from models.UserInitModel import UserInitModel
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
 class UserOperations(BaseDatabaseOperation):
-    
+    async def get_or_set(self, fp: str) -> dict:
+        try:
+            user_data = await self.db.users.find_one({"user_id": fp}, {'_id': 0})
+            if user_data:
+                return user_data
+
+            epoch = datetime.now().strftime('%m%d%Y%H%M%S%f')[:-3]
+            user_document = UserInitModel(
+                user_id=fp,
+                email=f"Guest_{epoch}@drophouse.ai",
+                first_name="Guest",
+                last_name=epoch,
+                account_type='guest'
+            )
+
+            result = await self.db.users.insert_one(user_document.dict())
+            if result.inserted_id:
+                return user_document.dict()
+            else:
+                raise Exception("Failed to insert new guest user")
+        except Exception as e:
+            logger.error(f"Error retrieving or setting user data: {e}")
+            return {}
+
     async def get(self, user_id=None) -> list:
         try:
             # Fetch orders, either for a specific user or all orders if user_id is None
