@@ -7,6 +7,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from utils.format_error import format_error
+import win32api
 
 from routers import (
     auth_router,
@@ -106,10 +107,19 @@ app.include_router(static_router)
 app.include_router(org_router)
 
 # Graceful shutdown handler
-async def grace_shutdown(signal, loop):
-    logger.info(f"Received signal {signal.name}, shutting down gracefully...")
+async def grace_shutdown(signal: None, loop):
+    if signal:
+        logger.info(f"Received signal {signal.name}, shutting down gracefully...")
+    else:
+        logger.info("(Windows) Shutting down gracefully...")
     await close_mongo_connection()  # Close MongoDB connection here
     await close_redis_connection()  # Close Redis connection here
+
+    # Stop ongoing operations that might be using application resources
+    tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+    [task.cancel() for task in tasks]
+    await asyncio.gather(*tasks, return_exceptions=True)
+
     # Add any other shutdown cleanup logic (e.g., closing Redis if you're using it)
     loop.stop()
 
@@ -122,10 +132,16 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
     
-    # Register signal handlers for graceful shutdown
-    signals = (signal.SIGINT, signal.SIGTERM)
-    for s in signals:
-        loop.add_signal_handler(s, lambda s=s: asyncio.create_task(grace_shutdown(s, loop)))
+    if sys.platform == "win32":
+        def win_handler(event):
+            if event == win32api.CTRL_C_EVENT or event == win32api.CTRL_BREAK_EVENT:
+                asyncio.create_task(grace_shutdown(loop=loop))
+        win32api.SetConsoleCtrlHandler(win_handler, True)
+    else:
+        # Register signal handlers for graceful shutdown
+        signals = (signal.SIGINT, signal.SIGTERM)
+        for s in signals:
+            loop.add_signal_handler(s, lambda s=s: asyncio.create_task(grace_shutdown(s, loop)))
 
     try:
         port = int(os.environ.get("SERVER_PORT", 8080))
