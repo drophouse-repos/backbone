@@ -2,7 +2,7 @@ from pydantic import ConfigDict, BaseModel, Field, EmailStr
 from typing import Optional
 
 class UserInitModel(BaseModel):
-    user_id: str = Field(..., description="User's ID")
+    user_id: Optional[str] = Field(..., description="User's ID")
     email: EmailStr = Field(..., description="User's email address")
     first_name: str = Field(..., description="User's first name")
     last_name: str = Field(..., description="User's last name")
