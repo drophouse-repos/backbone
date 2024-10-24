@@ -123,59 +123,23 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     print(error_details)
     return JSONResponse(status_code=422, content={"detail": exc.errors()})
 
-def win_handler(loop):
-    def handler(event):
-        if event in (win32con.CTRL_C_EVENT, win32con.CTRL_BREAK_EVENT, win32con.CTRL_CLOSE_EVENT):
-            print("Ctrl+C event received")
-            loop.call_soon_threadsafe(shutdown_event.set)
-            return True
-        return False
-    return handler
-
-class UvicornServer(uvicorn.Server):
-    def install_signal_handlers(self):
-        pass
-        
-async def main():
-    port = int(os.environ.get("SERVER_PORT", 8080))
-    config = uvicorn.Config(app, host="0.0.0.0", port=port)
-    server = uvicorn.Server(config=config)
-
-    loop = asyncio.get_running_loop()
-    
-    if sys.platform == "win32":
-        win32api.SetConsoleCtrlHandler(win_handler(loop), True)
-    else:
-        for sig in (signal.SIGINT, signal.SIGTERM):
-            loop.add_signal_handler(sig, shutdown_event.set)
-
-    server_task = asyncio.create_task(server.serve())
-    shutdown_task = asyncio.create_task(wait_for_shutdown(server))
-
-    await asyncio.gather(server_task, shutdown_task)
-
 if __name__ == "__main__":
-    if sys.platform == 'win32':
-        try:
-            asyncio.run(main())
-        except KeyboardInterrupt:
-            logger.info("Shutting down due to KeyboardInterrupt...")
-        finally:
-            asyncio.run(close_mongo_connection())  # Ensure MongoDB closes
-            asyncio.run(close_redis_connection())  # Ensure Redis closes
-    else:
-        loop = asyncio.get_event_loop()
-        
+    loop = asyncio.get_event_loop()
+    
+    if not sys.platform == "win32":
         # Register signal handlers for graceful shutdown
         signals = (signal.SIGINT, signal.SIGTERM)
         for s in signals:
             loop.add_signal_handler(s, lambda s=s: asyncio.create_task(grace_shutdown(s, loop)))
 
-        try:
-            port = int(os.environ.get("SERVER_PORT", 8080))
-            uvicorn.run(app, host="0.0.0.0", port=port)
-        except KeyboardInterrupt:
-            logger.info("Shutting down due to KeyboardInterrupt...")
-            loop.run_until_complete(close_mongo_connection())  # Ensure MongoDB closes
-        finally:
-            loop.close()
+    try:
+        port = int(os.environ.get("SERVER_PORT", 8080))
+        uvicorn.run(app, host="0.0.0.0", port=port)
+    except KeyboardInterrupt:
+        logger.info("Shutting down due to KeyboardInterrupt...")
+        loop.run_until_complete(close_mongo_connection())  # Ensure MongoDB closes
+        loop.run_until_complete(close_redis_connection())  # Ensure Redis closes
+    finally:
+        if sys.platform == "win32":
+            loop.stop()
+        loop.close()
