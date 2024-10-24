@@ -7,6 +7,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from utils.format_error import format_error
+import win32api
+import win32con
 
 from routers import (
     auth_router,
@@ -105,13 +107,15 @@ app.include_router(email_router)
 app.include_router(static_router)
 app.include_router(org_router)
 
+shutdown_event = asyncio.Event()
+
 # Graceful shutdown handler
-async def grace_shutdown(signal, loop):
-    logger.info(f"Received signal {signal.name}, shutting down gracefully...")
+async def shutdown(server):
+    logger.info("Shutting down gracefully...")
     await close_mongo_connection()  # Close MongoDB connection here
     await close_redis_connection()  # Close Redis connection here
-    # Add any other shutdown cleanup logic (e.g., closing Redis if you're using it)
-    loop.stop()
+    server.should_exit = True
+    await server.shutdown()
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
@@ -119,19 +123,47 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     print(error_details)
     return JSONResponse(status_code=422, content={"detail": exc.errors()})
 
-if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-    
-    # Register signal handlers for graceful shutdown
-    signals = (signal.SIGINT, signal.SIGTERM)
-    for s in signals:
-        loop.add_signal_handler(s, lambda s=s: asyncio.create_task(grace_shutdown(s, loop)))
+def win_handler(loop):
+    def handler(event):
+        if event in (win32con.CTRL_C_EVENT, win32con.CTRL_BREAK_EVENT, win32con.CTRL_CLOSE_EVENT):
+            print("Ctrl+C event received")
+            loop.call_soon_threadsafe(shutdown_event.set)
+            return True
+        return False
+    return handler
 
+class UvicornServer(uvicorn.Server):
+    def install_signal_handlers(self):
+        pass
+
+async def main():
+    port = int(os.environ.get("SERVER_PORT", 8080))
+    config = uvicorn.Config(app, host="0.0.0.0", port=port)
+    server = uvicorn.Server(config=config)
+
+    loop = asyncio.get_running_loop()
+    
+    if sys.platform == "win32":
+        win32api.SetConsoleCtrlHandler(win_handler(loop), True)
+    else:
+        # Register signal handlers for graceful shutdown
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            loop.add_signal_handler(sig, shutdown_event.set)
+
+    server_task = asyncio.create_task(server.serve())
+    shutdown_task = asyncio.create_task(wait_for_shutdown(server))
+
+    await asyncio.gather(server_task, shutdown_task)
+
+async def wait_for_shutdown(server):
+    await shutdown_event.wait()
+    await shutdown(server)
+
+if __name__ == "__main__":
     try:
-        port = int(os.environ.get("SERVER_PORT", 8080))
-        uvicorn.run(app, host="0.0.0.0", port=port)
+        asyncio.run(main())
     except KeyboardInterrupt:
         logger.info("Shutting down due to KeyboardInterrupt...")
-        loop.run_until_complete(close_mongo_connection())  # Ensure MongoDB closes
     finally:
-        loop.close()
+        asyncio.run(close_mongo_connection())  # Ensure MongoDB closes
+        asyncio.run(close_redis_connection())  # Ensure Redis closes
