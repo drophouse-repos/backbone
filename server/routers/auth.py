@@ -206,9 +206,7 @@ async def setorget_guest(
 	salt_db_ops: BaseDatabaseOperation = Depends(get_db_ops(SaltOperations))
 ):
     try:
-        print("request in auth router: ", request)
         result = await db_ops.get_or_set(request, salt_db_ops=salt_db_ops)
-        print("result in auth router: ", result)
         token = create_jwt_token(result['user_id'])
         return {
         	'user_data': result,

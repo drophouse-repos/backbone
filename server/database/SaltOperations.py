@@ -37,14 +37,10 @@ class SaltOperations(BaseDatabaseOperation):
     async def decrypt_and_remove(self, salt_info: EncryptModel, remove_key: bool = True) -> str:
         key_id = salt_info.salt_id
         key_document = await self.db.salts.find_one({"_id": key_id})
-
-        print(f"key_id is: {key_id}, key document is: {key_document}")
         if not key_document:
             raise ValueError("Key not found")
         
         key_document = key_document['salt']
-        print(f"key_document is: {key_document}")
-        print(f"salt_info.encrypted_data is: {salt_info.encrypted_data}")
         fernet = Fernet(key_document)
         decrypted_data = fernet.decrypt(salt_info.encrypted_data.encode())
         decrypted_data = decrypted_data.decode()
@@ -52,5 +48,4 @@ class SaltOperations(BaseDatabaseOperation):
         if remove_key:
             await self.db.salts.delete_one({"_id": key_id})
 
-        print(f"about to return decrypted data: {decrypted_data}")
         return decrypted_data

@@ -80,9 +80,7 @@ async def set_redis_images(user_id, task_id, index, task_info):
 
 async def get_redis_task(user_id, task_id):
     redis = get_redis_database()   
-    print(f"get_redis_task user_id: {user_id}, task_id: {task_id}")
     task_info = await redis.hget(f"user:{user_id}:tasks", task_id)
-    print(f"get_redis_task task_info: {task_info}")
     return json.loads(task_info) if task_info else None
 
 async def get_redis_images(user_id, task_id, index):
@@ -322,17 +320,11 @@ async def get_generated_image(
     analysis_db_ops: BaseDatabaseOperation = Depends(get_db_ops(AnalysisOperations)),
 ):
     try:
-        print(f"imagen.py user_id before: {user_id}")
-        print(f"imagen.py request: {request}")
-        print(f"image request.user_key: {request.user_key}")
         if request.user_key: # user_key only exists for guest users
             user_id = await salt_db_ops.decrypt_and_remove(EncryptModel(salt_id=request.user_key, encrypted_data=user_id), remove_key=False)
-            print(f"image user_id: {user_id}")
         photo = None
         task_id = request.task_id
-        print(f"redis user_id: {user_id}")
         task_info = await get_redis_task(user_id, task_id)
-        print(f"image task_info: {task_info}")
         if not task_info:
             raise HTTPException(status_code=400, detail={'message':"Please try again",'currentFrame': getframeinfo(currentframe())})
 
