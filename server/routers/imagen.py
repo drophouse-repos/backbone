@@ -5,7 +5,7 @@ from datetime import datetime
 import difflib
 import io
 import json
-from typing import Callable
+from typing import Callable, Optional
 import uuid
 import openai
 from fastapi import APIRouter, HTTPException, BackgroundTasks
@@ -15,11 +15,13 @@ from dotenv import load_dotenv
 import os
 from fastapi import Depends
 import logging
+from models.EncryptModel import EncryptModel
 from db import get_db_ops
 from models.BrowsedImageDataModel import BrowsedImageDataModel
 from models.AnalysisModel import AnalysisModel
 from database.BrowsedImageOperations import BrowsedImageOperations
 from database.BASE import BaseDatabaseOperation
+from database.SaltOperations import SaltOperations
 from database.PromptOperations import PromptOperations
 from database.AnalysisOperations import AnalysisOperations
 from ai_models.ImageGenerator import ImageGenerator
@@ -53,11 +55,13 @@ class StorePromptRequest(BaseModel):
 
 class AskGPTRequest(BaseModel):
     prompt: str
+    user_key: Optional[str] = None
     
 class ImageRequest(BaseModel):
     idx: int
     prompt: str
     task_id: str
+    user_key: Optional[str] = None
 
 key = os.environ.get("OPENAI_KEY")
 client = AsyncOpenAI(api_key=key)
@@ -76,7 +80,9 @@ async def set_redis_images(user_id, task_id, index, task_info):
 
 async def get_redis_task(user_id, task_id):
     redis = get_redis_database()   
+    print(f"get_redis_task user_id: {user_id}, task_id: {task_id}")
     task_info = await redis.hget(f"user:{user_id}:tasks", task_id)
+    print(f"get_redis_task task_info: {task_info}")
     return json.loads(task_info) if task_info else None
 
 async def get_redis_images(user_id, task_id, index):
@@ -221,9 +227,12 @@ async def generate_text(request: AskGPTRequest,
                         retry: int = 0,
                         ai_model_primary = Depends(get_ai_model(TitanImageGenerator)),
                         ai_model_secondary = Depends(get_ai_model(OpenAIImageGenerator)),
+                        salt_db_ops: BaseDatabaseOperation = Depends(get_db_ops(SaltOperations)),
                         user_id: str = Depends(verify_id_token),                       
                         ):
     try:
+        if request.user_key: # user_key only exists for guest users
+            user_id = await salt_db_ops.decrypt_and_remove(EncryptModel(salt_id=request.user_key, encrypted_data=user_id), remove_key=False)
         if len(request.prompt) > 600:   
             raise HTTPException(status_code=400, detail={'message':"Prompt is too long",'currentFrame': getframeinfo(currentframe())})
         profane = predict([request.prompt])   
@@ -309,12 +318,21 @@ async def get_generated_image(
     background_tasks: BackgroundTasks,
     user_id: str = Depends(verify_id_token),
     db_ops: BaseDatabaseOperation = Depends(get_db_ops(BrowsedImageOperations)),
+    salt_db_ops: BaseDatabaseOperation = Depends(get_db_ops(SaltOperations)),
     analysis_db_ops: BaseDatabaseOperation = Depends(get_db_ops(AnalysisOperations)),
 ):
     try:
+        print(f"imagen.py user_id before: {user_id}")
+        print(f"imagen.py request: {request}")
+        print(f"image request.user_key: {request.user_key}")
+        if request.user_key: # user_key only exists for guest users
+            user_id = await salt_db_ops.decrypt_and_remove(EncryptModel(salt_id=request.user_key, encrypted_data=user_id), remove_key=False)
+            print(f"image user_id: {user_id}")
         photo = None
         task_id = request.task_id
+        print(f"redis user_id: {user_id}")
         task_info = await get_redis_task(user_id, task_id)
+        print(f"image task_info: {task_info}")
         if not task_info:
             raise HTTPException(status_code=400, detail={'message':"Please try again",'currentFrame': getframeinfo(currentframe())})
 

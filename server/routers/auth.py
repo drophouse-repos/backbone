@@ -3,6 +3,7 @@ import logging
 import os
 import traceback
 from inspect import currentframe, getframeinfo
+from typing import Optional
 from fastapi import APIRouter, HTTPException, Request, Response
 from dotenv import load_dotenv
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -193,17 +194,21 @@ async def saml_jwt(
 	except Exception as e:
 		logger.error(f"Error creating jwt token : {e}")
 		return False
-
-class fingerprint(BaseModel):
-    fingerprint: str
+	
+class EncryptModel(BaseModel):
+	salt_id: Optional[str] = None
+	encrypted_data: Optional[str] = None
 
 @auth_router.post("/set-or-get-guest")
 async def setorget_guest(
-	request : fingerprint,
-    db_ops: BaseDatabaseOperation = Depends(get_db_ops(UserOperations))
+	request : EncryptModel,
+    db_ops: BaseDatabaseOperation = Depends(get_db_ops(UserOperations)),
+	salt_db_ops: BaseDatabaseOperation = Depends(get_db_ops(SaltOperations))
 ):
     try:
-        result = await db_ops.get_or_set(request.fingerprint)
+        print("request in auth router: ", request)
+        result = await db_ops.get_or_set(request, salt_db_ops=salt_db_ops)
+        print("result in auth router: ", result)
         token = create_jwt_token(result['user_id'])
         return {
         	'user_data': result,

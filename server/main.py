@@ -138,8 +138,5 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         logger.info("Shutting down due to KeyboardInterrupt...")
         loop.run_until_complete(close_mongo_connection())  # Ensure MongoDB closes
-        loop.run_until_complete(close_redis_connection())  # Ensure Redis closes
     finally:
-        if sys.platform == "win32":
-            loop.stop()
         loop.close()
