@@ -225,7 +225,7 @@ async def generate_text(request: AskGPTRequest,
                         retry: int = 0,
                         ai_model_primary = Depends(get_ai_model(TitanImageGenerator)),
                         ai_model_secondary = Depends(get_ai_model(OpenAIImageGenerator)),
-                        salt_db_ops: BaseDatabaseOperation = Depends(get_db_ops(SaltOperations)),
+                        salt_db_ops: SaltOperations = Depends(get_db_ops(SaltOperations)),
                         user_id: str = Depends(verify_id_token),                       
                         ):
     try:
@@ -316,7 +316,7 @@ async def get_generated_image(
     background_tasks: BackgroundTasks,
     user_id: str = Depends(verify_id_token),
     db_ops: BaseDatabaseOperation = Depends(get_db_ops(BrowsedImageOperations)),
-    salt_db_ops: BaseDatabaseOperation = Depends(get_db_ops(SaltOperations)),
+    salt_db_ops: SaltOperations = Depends(get_db_ops(SaltOperations)),
     analysis_db_ops: BaseDatabaseOperation = Depends(get_db_ops(AnalysisOperations)),
 ):
     try:
