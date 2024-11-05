@@ -1,15 +1,51 @@
 from datetime import datetime, timedelta
 import logging
 from database.BASE import BaseDatabaseOperation
+from database.SaltOperations import SaltOperations
+from fastapi import Depends
+from db import get_db_ops
 from models.OrderItemModel import OrderItem
 from aws_utils import generate_presigned_url
-
+from models.UserInitModel import UserInitModel
+from models.EncryptModel import EncryptModel
+import uuid
+from typing import Optional
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
 class UserOperations(BaseDatabaseOperation):
-    
+    async def get_or_set(self, encrypt_model: EncryptModel, salt_db_ops: SaltOperations) -> dict:
+        try:
+            if encrypt_model and encrypt_model.salt_id and encrypt_model.encrypted_data:
+                user_id = await salt_db_ops.decrypt_and_remove(encrypt_model, remove_key=False)
+                user_data = await self.db.users.find_one({"user_id": user_id}, {'_id': 0})
+                if user_data:
+                    user_data['user_id'] = encrypt_model.encrypted_data
+                    user_data['key_id'] = encrypt_model.salt_id
+                    return user_data
+            else:
+                epoch = datetime.now().strftime('%m%d%Y%H%M%S%f')[:-3]
+                new_guest_id = str(uuid.uuid4())
+                user_doc = UserInitModel(
+                    user_id=new_guest_id, # store unencrypted guest id in db
+                    email=f"Guest_{epoch}@drophouse.ai",
+                    first_name="Guest",
+                    last_name=epoch,
+                    account_type='guest'
+                )
+                result = await self.db.users.insert_one(user_doc.dict())
+                if result.inserted_id:
+                    encrypt_model = await salt_db_ops.create_and_encrypt(new_guest_id)
+                    user_dict = user_doc.dict()
+                    user_dict['user_id'] = encrypt_model.encrypted_data
+                    user_dict['key_id'] = encrypt_model.salt_id
+                    return user_dict
+                else:
+                    raise Exception("Failed to insert new guest user")
+        except Exception as e:
+            logger.error(f"Error retrieving or setting user data: {e}")
+            return {}
+
     async def get(self, user_id=None) -> list:
         try:
             # Fetch orders, either for a specific user or all orders if user_id is None

@@ -64,7 +64,7 @@ async def create_student_checkout(
             if thumbnail and thumbnail.startswith("data:image"):
                 processAndSaveImage(thumbnail, thumbnail_img_id, "thumbnails-cart")
                 item.thumbnail = thumbnail_img_id
-            if item.toggled and item.toggled.startswith("data:image"):
+            if item.toggled and isinstance(item.toggled, str) and item.toggled.startswith("data:image"):
                 processAndSaveImage(item.toggled, f"e_{item.img_id}", "browse-image-v2")
                 item.toggled = True
 
@@ -162,7 +162,7 @@ async def create_checkout_session(
             processAndSaveImage(thumbnail, thumbnail_img_id, "thumbnails-cart")
             item.thumbnail = thumbnail_img_id
             thumbnail = generate_presigned_url(thumbnail_img_id, "thumbnails-cart")
-        if item.toggled and item.toggled.startswith("data:image"):
+        if item.toggled and isinstance(item.toggled, str) and item.toggled.startswith("data:image"):
             processAndSaveImage(item.toggled, f"e_{item.img_id}", "browse-image-v2")
             item.toggled = True
         

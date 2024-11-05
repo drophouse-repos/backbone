@@ -34,10 +34,9 @@ class SaltOperations(BaseDatabaseOperation):
         await self.db.salts.insert_one(salt_document)
         return EncryptModel(salt_id=key_id, encrypted_data=encrypted_data)
 
-    async def decrypt_and_remove(self, salt_info: EncryptModel) -> str:
+    async def decrypt_and_remove(self, salt_info: EncryptModel, remove_key: bool = True) -> str:
         key_id = salt_info.salt_id
         key_document = await self.db.salts.find_one({"_id": key_id})
-    
         if not key_document:
             raise ValueError("Key not found")
         
@@ -46,5 +45,7 @@ class SaltOperations(BaseDatabaseOperation):
         decrypted_data = fernet.decrypt(salt_info.encrypted_data.encode())
         decrypted_data = decrypted_data.decode()
 
-        await self.db.salts.delete_one({"_id": key_id})
+        if remove_key:
+            await self.db.salts.delete_one({"_id": key_id})
+
         return decrypted_data

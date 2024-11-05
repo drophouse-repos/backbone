@@ -33,6 +33,10 @@ from firebase_admin import credentials
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
+if sys.platform == "win32":
+    import win32api
+    import win32con
+
 load_dotenv()
 cred = credentials.Certificate("service_firebase.json")
 firebase_admin.initialize_app(cred)
@@ -122,10 +126,11 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
     
-    # Register signal handlers for graceful shutdown
-    signals = (signal.SIGINT, signal.SIGTERM)
-    for s in signals:
-        loop.add_signal_handler(s, lambda s=s: asyncio.create_task(grace_shutdown(s, loop)))
+    if not sys.platform == "win32":
+        # Register signal handlers for graceful shutdown
+        signals = (signal.SIGINT, signal.SIGTERM)
+        for s in signals:
+            loop.add_signal_handler(s, lambda s=s: asyncio.create_task(grace_shutdown(s, loop)))
 
     try:
         port = int(os.environ.get("SERVER_PORT", 8080))
