@@ -43,7 +43,10 @@ firebase_admin.initialize_app(cred)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 from email_service.EmailService import EmailService
-app = FastAPI()
+app = FastAPI(
+    docs_url="/docs" if os.getenv("ENV") == "development" else None,
+    redoc_url="/redoc" if os.getenv("ENV") == "development" else None,
+)
 email_service = EmailService()
 
 app.add_middleware(
