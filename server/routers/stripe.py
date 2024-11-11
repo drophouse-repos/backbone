@@ -176,7 +176,7 @@ async def create_checkout_session(
             "price_data": {
                 "currency": "usd",
                 "product_data": {
-                    "name": f"{color} {apparel}" if (apparel != 'mug' and apparel != 'Mug') else f"{org_name} mug/ornament",
+                    "name": f"{org_name} {color} {apparel}" if (apparel != 'mug' and apparel != 'Mug') else f"{org_name} mug/ornament",
                     "description": f"{item.prompt}\nSize: {item.size}",
                     "images": [thumbnail],
                     # "metadata": {
