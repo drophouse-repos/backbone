@@ -240,7 +240,7 @@ async def generate_text(request: AskGPTRequest,
         response_json, message = validate_structure(response_text)
         if not response_json:
             if retry < 3:
-                return await generate_text(request, retry=retry+1, ai_model_primary=ai_model_primary, ai_model_secondary=ai_model_secondary) 
+                return await generate_text(request, retry=retry+1, ai_model_primary=ai_model_primary, ai_model_secondary=ai_model_secondary, salt_db_ops=salt_db_ops, user_id=user_id)
             else:
                 raise HTTPException(status_code=409, detail={'message':"The chance of this not working is 1 in a million, but it just happened. Please try again.",'currentFrame': getframeinfo(currentframe())}) 
         
